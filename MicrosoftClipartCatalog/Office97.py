@@ -23,6 +23,7 @@ TEXT_ENCODING = 'latin-1'
 class MicrosoftClipArt30Catalog:
     def __init__(self, catalog_filepath):
         # READ THE CATALOG FILE.
+        self.filepath = catalog_filepath
         catalog_file = olefile.OleFileIO(catalog_filepath)
         category_stream = catalog_file.openstream('Category')
         nail_stream = catalog_file.openstream('Nail')
@@ -53,6 +54,14 @@ class MicrosoftClipArt30Catalog:
         # some interesting strings but isn't relevant to defining
         # cliparts, so we'll just throw it away.
         thumb_junk = thumb_stream.read()
+
+    def export(self, export_directory_path):
+        export_filename = os.path.basename(self.filepath) + '.json'
+        export_filepath = os.path.join(export_directory_path, export_filename)
+        with open(export_filepath, 'w') as json_file:
+            self_as_dictionary = jsons.dump(self)
+            self_as_json_string = json.dumps(self_as_dictionary, indent = 2)
+            json_file.write(self_as_json_string)
 
 ## A clip art category in the Category stream.
 class Category:
@@ -125,24 +134,3 @@ class ClipEntry:
 
 class ThumbnailImage:
     pass
-
-# READ THE CLIPART.
-clipart_base_directory = '/run/media/npgentry/OFFICE97PRO/CLIPART'
-clipart_files = [
-    'MMEDIA/MMEDIA.CAG',
-    'OFFICE/OFFICE.CAG',
-    'PHOTOS/PHOTOS.CAG',
-    'POPULAR/POP97.CAG',
-    'POWERPNT/POWERPNT.CAG',
-    'SCRBEANS/SCRBEANS.CAG'
-]
-
-catalogs = {}
-for clipart_file in clipart_files:
-    full_path = os.path.join(clipart_base_directory, clipart_file)
-    print(full_path)
-    catalog = {clipart_file: MicrosoftClipArt30Catalog(full_path)}
-    catalogs.update(catalog)
-
-with open('/home/npgentry/test.json', 'w') as f:
-    f.write(json.dumps(jsons.dump(catalogs)))
