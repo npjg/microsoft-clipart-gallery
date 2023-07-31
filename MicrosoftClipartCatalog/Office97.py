@@ -121,7 +121,10 @@ class ClipEntry:
         # (usually "C:\").
         self.subdirectory = struct.unpack.pascal_string(stream).decode(TEXT_ENCODING)
         k = struct.unpack.pascal_string(stream)
-        self.keywords = k.decode(TEXT_ENCODING)
+        keywords_string = k.decode(TEXT_ENCODING)
+        KEYWORD_SEPARATOR = ','
+        self.keywords = keywords_string.split(KEYWORD_SEPARATOR)
+
 
         # READ THE REMAINING DATA.
         # It looks like this is just junk data that can be 
