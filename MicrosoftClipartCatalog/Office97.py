@@ -46,7 +46,7 @@ class MicrosoftClipArt30Catalog:
         thumb_stream.seek(0x190)
         self.entries = []
         entry = ClipEntry(thumb_stream)
-        while entry.is_valid:
+        while entry._is_valid:
             self.entries.append(entry)
             entry = ClipEntry(thumb_stream)
         # After all the file definition entries have been read,
@@ -59,7 +59,7 @@ class MicrosoftClipArt30Catalog:
         export_filename = os.path.basename(self.filepath) + '.json'
         export_filepath = os.path.join(export_directory_path, export_filename)
         with open(export_filepath, 'w') as json_file:
-            self_as_dictionary = jsons.dump(self)
+            self_as_dictionary = jsons.dump(self, strip_privates = True)
             self_as_json_string = json.dumps(self_as_dictionary, indent = 2)
             json_file.write(self_as_json_string)
 
@@ -92,28 +92,28 @@ class ClipEntry:
         # entries, but the type of the entry determines how
         # long it is in the stream.
         entry_start = stream.tell()
-        self.type = struct.unpack.uint32_le(stream)
-        if self.type == 0x10:
+        self._type = struct.unpack.uint32_le(stream)
+        if self._type == 0x10:
             total_length = 0x320
-        elif self.type == 0x20:
+        elif self._type == 0x20:
             total_length = 0x640
-        elif self.type == 0x28:
+        elif self._type == 0x28:
             total_length = 0x640
-        elif self.type == 0x30:
+        elif self._type == 0x30:
             total_length = 0x190
-        elif self.type == 0xa0:
+        elif self._type == 0xa0:
             total_length = 640
         else:
             # STOP READING THIS ENTRY.
             # Reading an invalid type probably means we have read
             # all the data in the stream and all remaining data
             # is junk.
-            self.is_valid = False
+            self._is_valid = False
             return
 
         # FIND THE TOTAL LENGTH OF THIS ENTRY.
         entry_end = entry_start + total_length
-        self.is_valid = True
+        self._is_valid = True
 
         # READ THE STRINGS.
         self.filename = struct.unpack.pascal_string(stream).decode(TEXT_ENCODING)
