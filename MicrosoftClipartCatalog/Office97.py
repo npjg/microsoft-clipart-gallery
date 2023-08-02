@@ -4,6 +4,7 @@ import os
 import json
 import jsons
 
+from PIL import Image
 import olefile
 import self_documenting_struct as struct
 
@@ -34,36 +35,74 @@ class MicrosoftClipArt30Catalog:
         self.unk2 = struct.unpack.uint32_le(category_stream)
         category_count = struct.unpack.uint32_le(category_stream)
         self.unk3 = struct.unpack.uint32_le(category_stream)
-        self.categories = []
+        self._categories = []
         # The master category has the label "(All Categories)"
         # and includes all clips in this catalog.
-        self.master_category = Category(category_stream)
         for index in range(category_count):
             category = Category(category_stream)
-            self.categories.append(category)
+            self._categories.append(category)
 
-        # READ THE FILE DEFINITION ENTRIES.
+        # READ THE CLIPART DECLARATIONS.
         thumb_stream.seek(0x190)
-        self.entries = []
-        entry = ClipEntry(thumb_stream)
-        while entry._is_valid:
-            self.entries.append(entry)
-            entry = ClipEntry(thumb_stream)
+        nail_stream.seek(0x800)
+        self.clipart_declarations = []
+        clipart_declaration = ClipartDeclaration(thumb_stream, nail_stream)
+        while clipart_declaration._is_valid:
+            self.clipart_declarations.append(clipart_declaration)
+            clipart_declaration = ClipartDeclaration(thumb_stream, nail_stream)
         # After all the file definition entries have been read,
         # the rest of the thumb stream is junk. This contains
         # some interesting strings but isn't relevant to defining
         # cliparts, so we'll just throw it away.
-        thumb_junk = thumb_stream.read()
+        self._thumb_junk = thumb_stream.read()
 
+        # ASSIGN IDs TO THE CLIPART DECLARATIONS.
+        for clip_id, clipart_declaration in zip(self.master_category.clip_ids, self.clipart_declarations):
+            clipart_declaration.id = clip_id
+
+            # FIND THE CATEGORY FOR THIS CLIPART.
+            for category in self._categories:
+                if clip_id in category.clip_ids:
+                    clipart_declaration.categories.append(category.title)
+
+    ## The master category has the ASCII label "(All Categories)" and includes the IDs of all clips in this catalog. 
+    @property
+    def master_category(self) -> 'Category':
+        # However, it's not always clear which one this is, as sometimes there are multiple categories with this name
+        # in ASCII that are only differentiated by some special characters at the end of the name. For example:
+        #  - "(All Categories)\u0001\u0001"
+        #  - "(All Categories)\u0001\u0002"
+        # So we will treat the category that contains the same number of clip IDs as the number of clipart declarations
+        # as the master category.
+        for category in self._categories:
+            if len(category.clip_ids) - 1 == len(self.clipart_declarations):
+                return category
+        raise ValueError('Master category not found. This Clip Art Catalog 3.0 file is probably corrupt.')
+
+    ## Exports the data in this clipart catalog file to the filesystem.
     def export(self, export_directory_path):
-        export_filename = os.path.basename(self.filepath) + '.json'
-        export_filepath = os.path.join(export_directory_path, export_filename)
-        with open(export_filepath, 'w') as json_file:
+        # EXPORT THE JSON.
+        json_filename = os.path.basename(self.filepath) + '.json'
+        json_filepath = os.path.join(export_directory_path, json_filename)
+        with open(json_filepath, 'w') as json_file:
             self_as_dictionary = jsons.dump(self, strip_privates = True)
             self_as_json_string = json.dumps(self_as_dictionary, indent = 2)
             json_file.write(self_as_json_string)
 
-## A clip art category in the Category stream.
+        # EXPORT THE JUNK DATA.
+        thumb_junk_filename = os.path.basename(self.filepath) + '.thumb_junk.dat'
+        thumb_junk_filepath = os.path.join(export_directory_path, thumb_junk_filename)
+        with open(thumb_junk_filepath, 'wb') as thumb_junk_file:
+            thumb_junk_file.write(self._thumb_junk)
+
+        # EXPORT THE THUMBNAILS.
+        for clipart_declaration in self.clipart_declarations:
+            thumbnail_filename = clipart_declaration.filename + '.thumbnail.bmp'
+            thumbnail_filepath = os.path.join(export_directory_path, thumbnail_filename)
+            clipart_declaration._thumbnail.save(thumbnail_filepath)
+
+## A clip art category, which contains references to clip art images by ID.
+## Stored in the "Category" stream.
 class Category:
     def __init__(self, stream):
         # READ THE TITLE.
@@ -84,9 +123,17 @@ class Category:
             clip_id = struct.unpack.uint32_le(stream)
             self.clip_ids.append(clip_id)
 
-## An entry in the thumb stream.
-class ClipEntry:
-    def __init__(self, stream):
+## Contains metadata about a single clipart image.
+## Stored in the "Thumb" stream.
+class ClipartDeclaration:
+    def __init__(self, stream, thumbnail):
+        # SET THE CATEGORY.
+        # The ID and category will be assigned later.
+        self._thumbnail: Image = Image.frombytes('P', (44, 88), thumbnail.read(44 * 88)).transpose(1)
+        thumbnail.read(0xe0)
+        self.id = None
+        self.categories = []
+
         # READ THE TYPE.
         # I don't know why there are three different "types" of
         # entries, but the type of the entry determines how
@@ -126,7 +173,6 @@ class ClipEntry:
         keywords_string = k.decode(TEXT_ENCODING)
         KEYWORD_SEPARATOR = ','
         self.keywords = keywords_string.split(KEYWORD_SEPARATOR)
-
 
         # READ THE REMAINING DATA.
         # It looks like this is just junk data that can be 
