@@ -102,7 +102,7 @@ class ClipEntry:
         elif self._type == 0x30:
             total_length = 0x190
         elif self._type == 0xa0:
-            total_length = 640
+            total_length = 0x640
         else:
             # STOP READING THIS ENTRY.
             # Reading an invalid type probably means we have read
