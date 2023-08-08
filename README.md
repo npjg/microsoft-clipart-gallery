@@ -1,5 +1,3 @@
-# microsoft-clipart-catalog
-
 Parses the clipart catalogs from various editions of Microsoft Office.
 
 ## Motivation

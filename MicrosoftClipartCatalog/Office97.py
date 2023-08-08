@@ -27,7 +27,10 @@ class MicrosoftClipArt30Catalog:
         self.filepath = catalog_filepath
         catalog_file = olefile.OleFileIO(catalog_filepath)
         category_stream = catalog_file.openstream('Category')
+        # The "Nail" stream is the one that actually holds the thumbnails.
         nail_stream = catalog_file.openstream('Nail')
+        # The "Thumb" stream actually holds metadata about each clip,
+        # not thumbnails.
         thumb_stream = catalog_file.openstream('Thumb')
 
         # READ THE CATEGORIES.
@@ -36,8 +39,6 @@ class MicrosoftClipArt30Catalog:
         category_count = struct.unpack.uint32_le(category_stream)
         self.unk3 = struct.unpack.uint32_le(category_stream)
         self._categories = []
-        # The master category has the label "(All Categories)"
-        # and includes all clips in this catalog.
         for index in range(category_count):
             category = Category(category_stream)
             self._categories.append(category)
@@ -56,11 +57,9 @@ class MicrosoftClipArt30Catalog:
         # cliparts, so we'll just throw it away.
         self._thumb_junk = thumb_stream.read()
 
-        # ASSIGN IDs TO THE CLIPART DECLARATIONS.
+        # PUT THE CLIPART IN THE PROPER CATEGORIES.
         for clip_id, clipart_declaration in zip(self.master_category.clip_ids, self.clipart_declarations):
             clipart_declaration.id = clip_id
-
-            # FIND THE CATEGORY FOR THIS CLIPART.
             for category in self._categories:
                 if clip_id in category.clip_ids:
                     clipart_declaration.categories.append(category.title)
@@ -98,8 +97,10 @@ class MicrosoftClipArt30Catalog:
         # EXPORT THE THUMBNAILS.
         for clipart_declaration in self.clipart_declarations:
             thumbnail_filename = clipart_declaration.filename + '.thumbnail.bmp'
+            print(thumbnail_filename)
             thumbnail_filepath = os.path.join(export_directory_path, thumbnail_filename)
             clipart_declaration._thumbnail.save(thumbnail_filepath)
+            input()
 
 ## A clip art category, which contains references to clip art images by ID.
 ## Stored in the "Category" stream.
