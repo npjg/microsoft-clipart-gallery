@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/npjg/microsoft-easter-eggs"
+Homepage = "https://github.com/npjg/microsoft-clipart-catalog"
 
 [project.scripts]
-MicrosoftEasterEggs = "MicrosoftEasterEggs:CommandLine.main"
+MicrosoftClipartCatalog = "MicrosoftClipartCatalog:CommandLine.main"
